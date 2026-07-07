@@ -63,7 +63,6 @@ RUN groupadd --gid ${GID} bitcoin \
   && apt-get install --yes --no-install-recommends \
     capnproto \
     gosu \
-    libboost-dev \
     libsqlite3-dev \
     libzmq3-dev \
     systemtap-sdt-dev \
