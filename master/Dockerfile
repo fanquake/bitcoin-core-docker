@@ -61,10 +61,10 @@ RUN groupadd --gid ${GID} bitcoin \
   && useradd --create-home --no-log-init -u ${UID} -g ${GID} bitcoin \
   && apt-get update --yes \
   && apt-get install --yes --no-install-recommends \
-    capnproto \
+    libcapnp-1.1.0 \
     gosu \
-    libsqlite3-dev \
-    libzmq3-dev \
+    libsqlite3-0 \
+    libzmq5 \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
