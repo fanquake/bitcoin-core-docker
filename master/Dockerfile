@@ -65,7 +65,6 @@ RUN groupadd --gid ${GID} bitcoin \
     gosu \
     libsqlite3-dev \
     libzmq3-dev \
-    systemtap-sdt-dev \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
