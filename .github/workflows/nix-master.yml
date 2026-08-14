@@ -1,0 +1,129 @@
+name: nix-nightly-master
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  push:
+    paths:
+      - ".github/workflows/nix-master.yml"
+      - "master/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nix-nightly-master
+  cancel-in-progress: false
+
+env:
+  REGISTRY_IMAGE: bitcoin/bitcoin
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    outputs:
+      revision: ${{ steps.bitcoin.outputs.revision }}
+    steps:
+      - name: Resolve Bitcoin Core master
+        id: bitcoin
+        run: |
+          revision="$(git ls-remote https://github.com/bitcoin/bitcoin.git refs/heads/master | cut -f1)"
+          test -n "$revision"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: source
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: DeterminateSystems/determinate-nix-action@v3
+
+      - name: Configure Cachix
+        uses: cachix/cachix-action@v17
+        with:
+          name: bitcoin-core-docker
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Build image
+        working-directory: master
+        run: |
+          nix build .#docker-image \
+            --override-input bitcoin-src github:bitcoin/bitcoin/${{ needs.source.outputs.revision }}
+
+      - name: Load and test image
+        working-directory: master
+        run: |
+          docker load < result
+          docker run --rm ${{ env.REGISTRY_IMAGE }}:master-${{ matrix.arch }} -version
+
+      - name: Login to Docker Hub
+        if: github.event_name == 'schedule'
+        uses: docker/login-action@v4
+        with:
+          username: bitcoin
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+      - name: Push image and record digest
+        if: github.event_name == 'schedule'
+        env:
+          IMAGE: ${{ env.REGISTRY_IMAGE }}:master-${{ matrix.arch }}
+        run: |
+          docker push "$IMAGE"
+          repo_digest="$(docker image inspect "$IMAGE" --format '{{index .RepoDigests 0}}')"
+          test -n "$repo_digest"
+          mkdir -p "${{ runner.temp }}/digests"
+          printf '%s\n' "$repo_digest" > "${{ runner.temp }}/digests/${{ matrix.arch }}"
+
+      - name: Upload digest
+        if: github.event_name == 'schedule'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    if: github.event_name == 'schedule'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: bitcoin
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Create manifest list
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.REGISTRY_IMAGE }}:master \
+            "$(cat "${{ runner.temp }}/digests/amd64")" \
+            "$(cat "${{ runner.temp }}/digests/arm64")"
+
+      - name: Test published image
+        run: docker run --rm ${{ env.REGISTRY_IMAGE }}:master -version
+
+      - name: Inspect manifest list
+        run: docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:master
