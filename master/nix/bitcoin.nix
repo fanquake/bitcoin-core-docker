@@ -5,7 +5,23 @@
 }:
 
 let
-  stdenv = pkgs.stdenv;
+  ccacheStats = "${pkgs.ccache}/bin/ccache";
+
+  stdenv = pkgs.ccacheStdenv.override {
+    stdenv = pkgs.stdenv;
+    extraConfig = ''
+      if [ -d /ccache ] && [ -w /ccache ]; then
+        unset CCACHE_DISABLE
+        export CCACHE_DIR=/ccache
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPILERCHECK=content
+        export CCACHE_MAXSIZE=2G
+        export CCACHE_SLOPPINESS=random_seed
+      else
+        export CCACHE_DISABLE=1
+      fi
+    '';
+  };
 
   zeromq = pkgs.zeromq.override {
     enableCurve = false;
@@ -62,6 +78,18 @@ stdenv.mkDerivation {
     "-DWITH_USDT=OFF"
     "-DWITH_ZMQ=ON"
   ];
+
+  preBuild = ''
+    if [ -d /ccache ] && [ -w /ccache ]; then
+      CCACHE_DIR=/ccache ${ccacheStats} --zero-stats
+    fi
+  '';
+
+  postBuild = ''
+    if [ -d /ccache ] && [ -w /ccache ]; then
+      CCACHE_DIR=/ccache ${ccacheStats} --show-stats
+    fi
+  '';
 
   installPhase = ''
     runHook preInstall

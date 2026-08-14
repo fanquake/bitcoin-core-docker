@@ -46,8 +46,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Prepare ccache
+        run: |
+          mkdir -p /tmp/bitcoin-ccache
+          chmod -R a+rwX /tmp/bitcoin-ccache
+
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
+        with:
+          extra-conf: |
+            extra-sandbox-paths = /ccache=/tmp/bitcoin-ccache
+
+      - name: Restore ccache
+        id: ccache
+        uses: actions/cache/restore@v5
+        continue-on-error: true
+        with:
+          path: /tmp/bitcoin-ccache
+          key: ccache-v1-${{ matrix.arch }}-${{ hashFiles('master/flake.lock', 'master/flake.nix', 'master/nix/*.nix') }}-${{ needs.source.outputs.revision }}
+          restore-keys: |
+            ccache-v1-${{ matrix.arch }}-${{ hashFiles('master/flake.lock', 'master/flake.nix', 'master/nix/*.nix') }}-
+
+      - name: Make ccache writable
+        run: sudo chmod -R a+rwX /tmp/bitcoin-ccache
 
       - name: Configure Cachix
         uses: cachix/cachix-action@v17
@@ -66,6 +87,17 @@ jobs:
         run: |
           docker load < result
           docker run --rm ${{ env.REGISTRY_IMAGE }}:master-${{ matrix.arch }} -version
+
+      - name: Make ccache readable
+        run: sudo chmod -R a+rwX /tmp/bitcoin-ccache
+
+      - name: Save ccache
+        if: steps.ccache.outputs.cache-hit != 'true' && steps.ccache.outputs.cache-primary-key != ''
+        uses: actions/cache/save@v5
+        continue-on-error: true
+        with:
+          path: /tmp/bitcoin-ccache
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
 
       - name: Login to Docker Hub
         if: github.event_name == 'schedule'
