@@ -46,8 +46,7 @@ RUN set -ex \
     -DWITH_CCACHE=ON \
     -DWITH_ZMQ=ON \
   && cmake --build build -j$(nproc) \
-  && strip build/bin/bitcoin-cli build/bin/bitcoin-tx build/bin/bitcoind \
-  && cmake --install build
+  && cmake --install build --strip
 
 # Second stage
 FROM debian:trixie-slim
