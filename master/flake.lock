@@ -1,0 +1,45 @@
+{
+  "nodes": {
+    "bitcoin-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786611761,
+        "narHash": "sha256-PKqh3mwY8VQ+xNGK+4NO3G0PCerDOQboxCuwcTwJr5Q=",
+        "owner": "bitcoin",
+        "repo": "bitcoin",
+        "rev": "11090c8bb359f894ef7d97b65aff52fe8191aec1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "bitcoin",
+        "ref": "master",
+        "repo": "bitcoin",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1786599213,
+        "narHash": "sha256-yNJd40f11EzXBjSByCB7IPpeFFAdeoSKKM67dGkfFoU=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "0e251e24a4f24e036a084b6b4b2d2491af4167f4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "bitcoin-src": "bitcoin-src",
+        "nixpkgs": "nixpkgs"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
